@@ -1,0 +1,11 @@
+flask
+flask-cors
+pandas
+numpy
+u8darts[notorch]
+lightgbm
+xgboost
+prophet
+statsmodels
+scikit-learn
+matplotlib

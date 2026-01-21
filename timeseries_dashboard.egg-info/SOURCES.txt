@@ -1,0 +1,14 @@
+MANIFEST.in
+pyproject.toml
+setup.py
+timeseries_dashboard/__init__.py
+timeseries_dashboard/app.py
+timeseries_dashboard.egg-info/PKG-INFO
+timeseries_dashboard.egg-info/SOURCES.txt
+timeseries_dashboard.egg-info/dependency_links.txt
+timeseries_dashboard.egg-info/entry_points.txt
+timeseries_dashboard.egg-info/requires.txt
+timeseries_dashboard.egg-info/top_level.txt
+timeseries_dashboard/static/index.html
+timeseries_dashboard/static/assets/index-56be94e4.css
+timeseries_dashboard/static/assets/index-93b97552.js

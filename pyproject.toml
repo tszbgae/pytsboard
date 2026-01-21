@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "timeseries-dashboard"
+version = "0.1.0"
+description = "A local forecasting and analysis dashboard"
+authors = [
+  { name="Your Name", email="your@email.com" },
+]
+dependencies = [
+    "flask",
+    "flask-cors",
+    "pandas",
+    "numpy",
+    "u8darts[notorch]",
+    "lightgbm",
+    "xgboost",
+    "prophet",
+    "statsmodels",
+    "scikit-learn",
+    "matplotlib"
+]
+requires-python = ">=3.9"
+
+# THIS CREATES THE CLI COMMAND
+[project.scripts]
+run-dashboard = "timeseries_dashboard:start_dashboard"
+
+# THIS INCLUDES THE FRONTEND FILES
+[tool.setuptools.package-data]
+timeseries_dashboard = ["static/**/*", "static/*"]

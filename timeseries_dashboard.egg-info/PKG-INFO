@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: timeseries-dashboard
+Version: 0.1.0
+Summary: A local forecasting and analysis dashboard
+Author-email: Your Name <your@email.com>
+Requires-Python: >=3.9
+Requires-Dist: flask
+Requires-Dist: flask-cors
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: u8darts[notorch]
+Requires-Dist: lightgbm
+Requires-Dist: xgboost
+Requires-Dist: prophet
+Requires-Dist: statsmodels
+Requires-Dist: scikit-learn
+Requires-Dist: matplotlib

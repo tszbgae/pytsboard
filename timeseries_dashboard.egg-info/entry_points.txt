@@ -1,0 +1,2 @@
+[console_scripts]
+run-dashboard = timeseries_dashboard:start_dashboard
