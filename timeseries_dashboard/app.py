@@ -15,15 +15,10 @@ from darts.models import (
     ARIMA
 )
 from darts.metrics import mape, rmse, mae
-# ... import your other dependencies (pandas, darts, etc.)
+from scipy.signal import savgol_filter
 
-# 1. FIND THE STATIC FOLDER RELATIVE TO THIS FILE
-# This ensures it works no matter where the user installs the package
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BASE_DIR, 'static')
-
-app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='')
-CORS(app) # Optional in production, but keeps things safe
+app = Flask(__name__, static_folder='dist', static_url_path='')
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # --- HELPER: Downsampling ---
 def smart_downsample(df, target_points=2000):
@@ -48,18 +43,11 @@ def smart_downsample(df, target_points=2000):
             
     return downsampled
 
-# ... [PASTE ALL YOUR EXISTING API ROUTES HERE] ...
-# (/api/analyze, /api/decompose, /api/predict, etc.)
+# --- ROUTES ---
 
-# 2. SERVE REACT FRONTEND
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve(path):
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    else:
-        # Fallback to index.html for React Router (SPA behavior)
-        return send_from_directory(app.static_folder, 'index.html')
+@app.route('/')
+def serve():
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_data():
@@ -70,6 +58,8 @@ def analyze_data():
         file = request.files['file']
         options = json.loads(request.form.get('options', '{}'))
         selected_columns = options.get('selectedColumns', [])
+        tsmode = options.get('mode')
+        print(tsmode)
 
         # 1. LOAD FULL DATAFRAME
         df = pd.read_csv(file)
@@ -324,26 +314,61 @@ def predict_data():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# 3. ENTRY POINT FUNCTION
-def start_dashboard():
-    # --- DEBUG PRINTS ---
-    print(f"📂 Current Directory: {os.getcwd()}")
-    print(f"📂 App Base Dir: {BASE_DIR}")
-    print(f"📂 Static Folder Target: {STATIC_DIR}")
-    
-    if os.path.exists(os.path.join(STATIC_DIR, 'index.html')):
-        print("✅ SUCCESS: index.html found!")
-    else:
-        print("❌ FAILURE: index.html is MISSING from the installed package.")
-        print(f"   Contents of {STATIC_DIR}:")
-        try:
-            print(os.listdir(STATIC_DIR))
-        except:
-            print("   (Directory does not exist)")
-    # --------------------
+@app.route('/api/savgol', methods=['POST'])
+def savgol_analysis():
+    try:
+        req = request.json
+        full_data = req.get('data', [])
+        col = req.get('column')
+        window = int(req.get('window', 15))
+        poly = int(req.get('poly', 3))
 
-    print(f"🚀 Dashboard launching on http://127.0.0.1:8080")
-    app.run(host='0.0.0.0', port=8080, debug=False)
+        if not full_data or not col:
+            return jsonify({"error": "Missing data"}), 400
+
+        df = pd.DataFrame(full_data)
+        
+        # Ensure column is numeric and fill NaNs
+        series = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # --- SAVGOL CONSTRAINTS ---
+        # 1. Window length must be odd
+        if window % 2 == 0:
+            window += 1
+        
+        # 2. Poly order must be less than window length
+        if poly >= window:
+            poly = window - 1
+            
+        # Apply Filter
+        smoothed = savgol_filter(series, window_length=window, polyorder=poly)
+        
+        # Calculate Residuals
+        residuals = series - smoothed
+        
+        # Format for Recharts
+        result_data = []
+        indices = df.index.tolist()
+        
+        # Create a combined list of dicts
+        for i, idx_val in enumerate(indices):
+            result_data.append({
+                "index": i,
+                "Original": series.iloc[i],
+                "Smoothed": smoothed[i],
+                "Residual": residuals.iloc[i]
+            })
+
+        return jsonify({
+            "status": "success",
+            "data": result_data,
+            "adjusted_params": {"window": window, "poly": poly}
+        })
+
+    except Exception as e:
+        print(f"SAVGOL Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    start_dashboard()
+    print("🚀 Server launching on http://127.0.0.1:5000")
+    app.run(debug=True, port=5000)
