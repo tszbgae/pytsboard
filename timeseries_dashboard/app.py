@@ -16,9 +16,15 @@ from darts.models import (
 )
 from darts.metrics import mape, rmse, mae
 from scipy.signal import savgol_filter
+# ... import your other dependencies (pandas, darts, etc.)
 
-app = Flask(__name__, static_folder='dist', static_url_path='')
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# 1. FIND THE STATIC FOLDER RELATIVE TO THIS FILE
+# This ensures it works no matter where the user installs the package
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, 'static')
+
+app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='')
+CORS(app) # Optional in production, but keeps things safe
 
 # --- HELPER: Downsampling ---
 def smart_downsample(df, target_points=2000):
@@ -43,11 +49,18 @@ def smart_downsample(df, target_points=2000):
             
     return downsampled
 
-# --- ROUTES ---
+# ... [PASTE ALL YOUR EXISTING API ROUTES HERE] ...
+# (/api/analyze, /api/decompose, /api/predict, etc.)
 
-@app.route('/')
-def serve():
-    return send_from_directory(app.static_folder, 'index.html')
+# 2. SERVE REACT FRONTEND
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        # Fallback to index.html for React Router (SPA behavior)
+        return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_data():
@@ -369,6 +382,75 @@ def savgol_analysis():
         print(f"SAVGOL Error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/savgol/export', methods=['POST'])
+def savgol_export():
+    try:
+        req = request.json
+        full_data = req.get('data', [])
+        col = req.get('column')
+        window = int(req.get('window', 15))
+        poly = int(req.get('poly', 3))
+
+        if not full_data or not col:
+            return jsonify({"error": "Missing data"}), 400
+
+        df = pd.DataFrame(full_data)
+        
+        # 1. Prepare Series
+        series = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # 2. Constraints (Odd Window, Poly < Window)
+        if window % 2 == 0: window += 1
+        if poly >= window: poly = window - 1
+            
+        # 3. Calculate
+        smoothed = savgol_filter(series, window_length=window, polyorder=poly)
+        residuals = series - smoothed
+        
+        # 4. Create New Column Names
+        smooth_name = f"{col}_svsmooth_{window}_{poly}"
+        resid_name = f"{col}_svresidual_{window}_{poly}"
+        
+        # 5. Append to DataFrame
+        df[smooth_name] = smoothed
+        df[resid_name] = residuals
+        
+        # 6. Return the UPDATED dataset
+        # We return the full data so the frontend can replace its current state
+        new_full_data = df.to_dict(orient='records')
+        new_columns = df.columns.tolist()
+
+        return jsonify({
+            "status": "success",
+            "message": f"Created columns: {smooth_name}, {resid_name}",
+            "data": new_full_data,
+            "columns": new_columns
+        })
+
+    except Exception as e:
+        print(f"SAVGOL EXPORT Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# 3. ENTRY POINT FUNCTION
+def start_dashboard():
+    # --- DEBUG PRINTS ---
+    print(f"📂 Current Directory: {os.getcwd()}")
+    print(f"📂 App Base Dir: {BASE_DIR}")
+    print(f"📂 Static Folder Target: {STATIC_DIR}")
+    
+    if os.path.exists(os.path.join(STATIC_DIR, 'index.html')):
+        print("✅ SUCCESS: index.html found!")
+    else:
+        print("❌ FAILURE: index.html is MISSING from the installed package.")
+        print(f"   Contents of {STATIC_DIR}:")
+        try:
+            print(os.listdir(STATIC_DIR))
+        except:
+            print("   (Directory does not exist)")
+    # --------------------
+
+    print(f"🚀 Dashboard launching on http://127.0.0.1:8080")
+    app.run(host='0.0.0.0', port=8080, debug=False)
+
 if __name__ == '__main__':
-    print("🚀 Server launching on http://127.0.0.1:5000")
-    app.run(debug=True, port=5000)
+    start_dashboard()
